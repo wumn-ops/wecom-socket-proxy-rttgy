@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+  <title>需求登记 - 上传图片</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f5f7fb;
+      --card: #ffffff;
+      --primary: #1677ff;
+      --text: #1f2329;
+      --muted: #8f959e;
+      --border: #e5e6eb;
+      --danger: #ff4d4f;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
+    .wrap {
+      max-width: 560px;
+      margin: 0 auto;
+      padding: 16px;
+    }
+    .card {
+      background: var(--card);
+      border-radius: 12px;
+      padding: 16px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+      margin-bottom: 12px;
+    }
+    h1 {
+      font-size: 18px;
+      margin: 0 0 8px;
+    }
+    .desc {
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.5;
+      margin-bottom: 12px;
+    }
+    .demand {
+      background: #f7f8fa;
+      border-radius: 8px;
+      padding: 12px;
+      font-size: 14px;
+      line-height: 1.6;
+      word-break: break-word;
+    }
+    .counter {
+      font-size: 14px;
+      margin: 12px 0;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+    }
+    .slot {
+      aspect-ratio: 1;
+      border: 1px dashed var(--border);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      overflow: hidden;
+      background: #fafafa;
+    }
+    .slot img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    .slot button.add {
+      border: none;
+      background: transparent;
+      color: var(--primary);
+      font-size: 13px;
+      cursor: pointer;
+      padding: 8px;
+    }
+    .slot .remove {
+      position: absolute;
+      top: 4px;
+      right: 4px;
+      border: none;
+      background: rgba(0, 0, 0, 0.55);
+      color: #fff;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      cursor: pointer;
+      font-size: 14px;
+      line-height: 1;
+    }
+    .actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 16px;
+    }
+    .btn {
+      flex: 1;
+      border: none;
+      border-radius: 8px;
+      padding: 12px 16px;
+      font-size: 15px;
+      cursor: pointer;
+    }
+    .btn-primary {
+      background: var(--primary);
+      color: #fff;
+    }
+    .btn-secondary {
+      background: #eef2f7;
+      color: var(--text);
+    }
+    .toast {
+      margin-top: 12px;
+      font-size: 13px;
+      color: var(--muted);
+      min-height: 18px;
+    }
+    .toast.error { color: var(--danger); }
+    .toast.success { color: #389e0d; }
+    .fallback-tip {
+      display: none;
+      margin-top: 12px;
+      padding: 12px;
+      background: #fff7e6;
+      border: 1px solid #ffd591;
+      border-radius: 8px;
+      font-size: 14px;
+      line-height: 1.6;
+      color: #ad6800;
+    }
+    input[type="file"] { display: none; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <h1>上传问题截图</h1>
+      <div class="desc">最多 3 张。添加完成后点「完成」，返回企业微信在登记卡片点击「提交登记」。</div>
+      <div class="demand" id="demand">加载中…</div>
+      <div class="counter" id="counter"></div>
+      <div class="grid" id="grid"></div>
+      <div class="toast" id="toast"></div>
+      <div class="fallback-tip" id="fallbackTip">请点左上角 <strong>返回</strong> 回到企业微信，在登记卡片点击「提交登记」。</div>
+      <div class="actions">
+        <button class="btn btn-primary" type="button" id="doneBtn">完成，返回企业微信</button>
+      </div>
+    </div>
+  </div>
+  <input type="file" id="fileInput" accept="image/*" />
+  <script src="https://cdn.jsdelivr.net/npm/@wecom/jssdk@2.2.5/dist/wecom.global.prod.js"></script>
+  <script src="https://open.work.weixin.qq.com/wwopen/js/jweixin-1.2.0.js"></script>
+  <script>
+    const params = new URLSearchParams(location.search);
+    const token = params.get("token") || "";
+    const demandEl = document.getElementById("demand");
+    const counterEl = document.getElementById("counter");
+    const gridEl = document.getElementById("grid");
+    const toastEl = document.getElementById("toast");
+    const fallbackTipEl = document.getElementById("fallbackTip");
+    const fileInput = document.getElementById("fileInput");
+    let pendingIndex = -1;
+    let state = { demand_content: "", image_count: 0, max_images: 3, images: [] };
+
+    function formatError(data, res) {
+      if (res.status === 413) {
+        return "图片过大，已被网关拦截(413)。请联系管理员调大 Nginx client_max_body_size，或换一张更小的截图重试。";
+      }
+      if (typeof data.detail === "string") return data.detail;
+      if (Array.isArray(data.detail)) {
+        return data.detail.map((item) => item.msg || JSON.stringify(item)).join("；");
+      }
+      if (data.message) return data.message;
+      const text = typeof data.detail === "string" ? data.detail : "";
+      if (text.includes("413") || text.includes("Request Entity Too Large")) {
+        return "图片过大，已被网关拦截(413)。请联系管理员调大 Nginx client_max_body_size。";
+      }
+      return text ? text.slice(0, 160) : `HTTP ${res.status} 请求失败`;
+    }
+
+    async function compressImage(file) {
+      const maxSide = 1920;
+      const quality = 0.82;
+      const maxBytes = 1800 * 1024;
+
+      if (!file.type.startsWith("image/") || file.type.includes("gif")) {
+        return file;
+      }
+      if (file.size <= 900 * 1024) {
+        return file;
+      }
+
+      const bitmap = await createImageBitmap(file);
+      const scale = Math.min(1, maxSide / Math.max(bitmap.width, bitmap.height));
+      const width = Math.max(1, Math.round(bitmap.width * scale));
+      const height = Math.max(1, Math.round(bitmap.height * scale));
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(bitmap, 0, 0, width, height);
+      bitmap.close();
+
+      let blob = await new Promise((resolve) =>
+        canvas.toBlob(resolve, "image/jpeg", quality)
+      );
+      if (!blob) return file;
+
+      let currentQuality = quality;
+      while (blob.size > maxBytes && currentQuality > 0.5) {
+        currentQuality -= 0.08;
+        blob = await new Promise((resolve) =>
+          canvas.toBlob(resolve, "image/jpeg", currentQuality)
+        );
+        if (!blob) break;
+      }
+      if (!blob) return file;
+
+      const base = (file.name || "upload").replace(/\.[^.]+$/, "");
+      return new File([blob], `${base}.jpg`, { type: "image/jpeg" });
+    }
+
+    function api(path, options = {}) {
+      const joiner = path.includes("?") ? "&" : "?";
+      const url = `/register/upload/api/${path}${joiner}token=${encodeURIComponent(token)}`;
+      return fetch(url, options).then(async (res) => {
+        let data = {};
+        const text = await res.text();
+        if (text) {
+          try {
+            data = JSON.parse(text);
+          } catch (_) {
+            data = { detail: text.slice(0, 120) };
+          }
+        }
+        if (!res.ok) throw new Error(formatError(data, res));
+        return data;
+      });
+    }
+
+    function setToast(text, type = "") {
+      toastEl.textContent = text;
+      toastEl.className = "toast" + (type ? ` ${type}` : "");
+    }
+
+    function render() {
+      demandEl.textContent = state.demand_content || "（无需求内容）";
+      counterEl.textContent = `已上传 ${state.image_count}/${state.max_images} 张`;
+      gridEl.innerHTML = "";
+      for (let i = 0; i < state.max_images; i += 1) {
+        const slot = document.createElement("div");
+        slot.className = "slot";
+        const image = state.images[i];
+        if (image) {
+          const img = document.createElement("img");
+          img.alt = image.title || `图片${i + 1}`;
+          img.src = image.preview_url || (
+            `/register/upload/api/preview?token=${encodeURIComponent(token)}&index=${i}`
+          );
+          slot.appendChild(img);
+          const remove = document.createElement("button");
+          remove.className = "remove";
+          remove.type = "button";
+          remove.textContent = "×";
+          remove.onclick = () => deleteImage(i);
+          slot.appendChild(remove);
+        } else {
+          const add = document.createElement("button");
+          add.className = "add";
+          add.type = "button";
+          add.textContent = "+ 添加";
+          add.onclick = () => pickImage(i);
+          slot.appendChild(add);
+        }
+        gridEl.appendChild(slot);
+      }
+    }
+
+    let leaving = false;
+    let jssdkReady = false;
+
+    function pageUrl() {
+      return location.href.split("#")[0];
+    }
+
+    function isWecomEnv() {
+      const ua = navigator.userAgent.toLowerCase();
+      return ua.includes("wxwork") || ua.includes("micromessenger");
+    }
+
+    function bindWeixinBridgeReady() {
+      if (typeof WeixinJSBridge !== "undefined") {
+        window.__wxBridgeReady = true;
+        return;
+      }
+      const markReady = () => {
+        window.__wxBridgeReady = true;
+      };
+      if (document.addEventListener) {
+        document.addEventListener("WeixinJSBridgeReady", markReady, false);
+      } else if (document.attachEvent) {
+        document.attachEvent("onWeixinJSBridgeReady", markReady);
+      }
+    }
+    bindWeixinBridgeReady();
+
+    async function initWecomJssdk() {
+      if (!isWecomEnv() || !window.ww) return false;
+      try {
+        const data = await api(`jssdk-config?url=${encodeURIComponent(pageUrl())}`);
+        if (!data.enabled) return false;
+
+        await new Promise((resolve) => {
+          let settled = false;
+          const finish = (ok) => {
+            if (settled) return;
+            settled = true;
+            jssdkReady = ok;
+            resolve(ok);
+          };
+
+          ww.register({
+            corpId: data.corpId,
+            agentId: data.agentId || undefined,
+            jsApiList: ["closeWindow"],
+            getConfigSignature: async () => data.config,
+            getAgentConfigSignature: data.agentConfig
+              ? async () => data.agentConfig
+              : undefined,
+            onConfigSuccess: () => finish(true),
+            onConfigFail: () => finish(false),
+            onAgentConfigSuccess: () => finish(true),
+            onAgentConfigFail: () => finish(false),
+          });
+          setTimeout(() => finish(jssdkReady), 2500);
+        });
+        return jssdkReady;
+      } catch (_) {
+        return false;
+      }
+    }
+
+    function invokeCloseWindow() {
+      const bridgeTargets = [window];
+      if (window.parent && window.parent !== window) {
+        bridgeTargets.push(window.parent);
+      }
+
+      bridgeTargets.forEach((target) => {
+        try {
+          const bridge = target.WeixinJSBridge;
+          if (!bridge) return;
+          if (typeof bridge.call === "function") {
+            bridge.call("closeWindow");
+          }
+          if (typeof bridge.invoke === "function") {
+            bridge.invoke("closeWindow", {}, function () {});
+          }
+        } catch (_) {}
+      });
+
+      try {
+        if (window.ww && typeof ww.closeWindow === "function") {
+          ww.closeWindow();
+        }
+      } catch (_) {}
+
+      try {
+        if (window.wx && typeof wx.closeWindow === "function") {
+          wx.closeWindow();
+        }
+      } catch (_) {}
+
+      try {
+        if (typeof window.close === "function") {
+          window.close();
+        }
+      } catch (_) {}
+    }
+
+    function closeWecomPage() {
+      invokeCloseWindow();
+
+      if (document.addEventListener) {
+        document.addEventListener("WeixinJSBridgeReady", invokeCloseWindow, false);
+      } else if (document.attachEvent) {
+        document.attachEvent("onWeixinJSBridgeReady", invokeCloseWindow);
+      }
+
+      [50, 150, 400].forEach((ms) => {
+        setTimeout(invokeCloseWindow, ms);
+      });
+
+      setTimeout(() => {
+        if (window.history.length > 1) {
+          window.history.back();
+          return;
+        }
+        fallbackTipEl.style.display = "block";
+        setToast("请点左上角 ← 返回企业微信", "success");
+      }, 700);
+    }
+
+    async function loadStatus() {
+      state = await api("status");
+      render();
+    }
+
+    function pickImage(index) {
+      pendingIndex = index;
+      fileInput.value = "";
+      fileInput.click();
+    }
+
+    async function uploadFile(file) {
+      setToast("正在压缩图片…");
+      const prepared = await compressImage(file);
+      const form = new FormData();
+      form.append("file", prepared);
+      const data = await api("image", { method: "POST", body: form });
+      state.image_count = data.image_count;
+      setToast("绑定成功，请点击完成，返回企业微信提交", "success");
+      await loadStatus();
+    }
+
+    async function deleteImage(index) {
+      await api(`image/delete?index=${index}`, { method: "POST" });
+      setToast("已删除", "success");
+      await loadStatus();
+    }
+
+    fileInput.addEventListener("change", async () => {
+      const file = fileInput.files && fileInput.files[0];
+      if (!file) return;
+      try {
+        setToast("上传中…");
+        await uploadFile(file);
+      } catch (err) {
+        setToast(err.message || "上传失败", "error");
+      }
+    });
+
+    document.getElementById("doneBtn").addEventListener("click", () => {
+      if (leaving) return;
+      leaving = true;
+      closeWecomPage();
+    });
+
+    if (!token) {
+      demandEl.textContent = "链接无效";
+    } else {
+      initWecomJssdk();
+      loadStatus().catch((err) => setToast(err.message, "error"));
+    }
+  </script>
+</body>
+</html>

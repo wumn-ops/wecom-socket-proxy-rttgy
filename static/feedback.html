@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+  <title>需求测试评价</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f5f7fb;
+      --card: #ffffff;
+      --primary: #1677ff;
+      --text: #1f2329;
+      --muted: #8f959e;
+      --border: #e5e6eb;
+      --danger: #ff4d4f;
+      --success: #389e0d;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
+    .wrap {
+      max-width: 560px;
+      margin: 0 auto;
+      padding: 16px;
+    }
+    .card {
+      background: var(--card);
+      border-radius: 12px;
+      padding: 16px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+      margin-bottom: 12px;
+    }
+    h1 {
+      font-size: 18px;
+      margin: 0 0 8px;
+    }
+    .desc {
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.5;
+      margin-bottom: 12px;
+    }
+    .demand {
+      background: #f7f8fa;
+      border-radius: 8px;
+      padding: 12px;
+      font-size: 14px;
+      line-height: 1.6;
+      word-break: break-word;
+      margin-bottom: 12px;
+    }
+    .meta {
+      font-size: 13px;
+      color: var(--muted);
+      margin-bottom: 16px;
+    }
+    .field-label {
+      font-size: 14px;
+      font-weight: 600;
+      margin: 16px 0 8px;
+    }
+    .options {
+      display: flex;
+      gap: 10px;
+    }
+    .option {
+      flex: 1;
+      border: 1px solid var(--border);
+      background: #fff;
+      border-radius: 8px;
+      padding: 12px;
+      font-size: 15px;
+      cursor: pointer;
+      text-align: center;
+    }
+    .option.active {
+      border-color: var(--primary);
+      color: var(--primary);
+      background: #eef5ff;
+    }
+    .score-grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 8px;
+    }
+    .score-btn {
+      border: 1px solid var(--border);
+      background: #fff;
+      border-radius: 8px;
+      padding: 10px 0;
+      font-size: 15px;
+      cursor: pointer;
+    }
+    .score-btn.active {
+      border-color: var(--primary);
+      color: var(--primary);
+      background: #eef5ff;
+    }
+    .readonly-box {
+      background: #f6ffed;
+      border: 1px solid #b7eb8f;
+      border-radius: 8px;
+      padding: 12px;
+      font-size: 14px;
+      line-height: 1.6;
+      color: #135200;
+    }
+    .actions {
+      margin-top: 20px;
+    }
+    .btn {
+      width: 100%;
+      border: none;
+      border-radius: 8px;
+      padding: 12px 16px;
+      font-size: 15px;
+      cursor: pointer;
+    }
+    .btn-primary {
+      background: var(--primary);
+      color: #fff;
+    }
+    .btn-primary:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+    .toast {
+      margin-top: 12px;
+      font-size: 13px;
+      color: var(--muted);
+      min-height: 18px;
+    }
+    .toast.error { color: var(--danger); }
+    .toast.success { color: var(--success); }
+    .fallback-tip {
+      display: none;
+      margin-top: 12px;
+      padding: 12px;
+      background: #fff7e6;
+      border: 1px solid #ffd591;
+      border-radius: 8px;
+      font-size: 14px;
+      line-height: 1.6;
+      color: #ad6800;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <h1>需求测试评价</h1>
+      <div class="desc">请确认测试结果并给出满意度评分（1-10 分）。</div>
+      <div class="demand" id="demand">加载中…</div>
+      <div class="meta" id="meta"></div>
+
+      <div id="formArea">
+        <div class="field-label">测试结果</div>
+        <div class="options" id="resultOptions"></div>
+
+        <div class="field-label">满意度打分</div>
+        <div class="score-grid" id="scoreGrid"></div>
+
+        <div class="actions">
+          <button class="btn btn-primary" type="button" id="submitBtn">提交评价</button>
+        </div>
+      </div>
+
+      <div id="readonlyArea" style="display:none;">
+        <div class="readonly-box" id="readonlyText"></div>
+        <div class="actions">
+          <button class="btn btn-primary" type="button" id="closeBtn">关闭</button>
+        </div>
+      </div>
+
+      <div class="toast" id="toast"></div>
+      <div class="fallback-tip" id="fallbackTip">请点左上角 <strong>返回</strong> 回到企业微信。</div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@wecom/jssdk@2.2.5/dist/wecom.global.prod.js"></script>
+  <script src="https://open.work.weixin.qq.com/wwopen/js/jweixin-1.2.0.js"></script>
+  <script>
+    const params = new URLSearchParams(location.search);
+    const token = params.get("token") || "";
+    const demandEl = document.getElementById("demand");
+    const metaEl = document.getElementById("meta");
+    const toastEl = document.getElementById("toast");
+    const fallbackTipEl = document.getElementById("fallbackTip");
+    const formArea = document.getElementById("formArea");
+    const readonlyArea = document.getElementById("readonlyArea");
+    const readonlyTextEl = document.getElementById("readonlyText");
+    const resultOptionsEl = document.getElementById("resultOptions");
+    const scoreGridEl = document.getElementById("scoreGrid");
+    const submitBtn = document.getElementById("submitBtn");
+    const closeBtn = document.getElementById("closeBtn");
+
+    let state = {
+      demand_content: "",
+      system_name: "",
+      already_submitted: false,
+      test_result_text: "",
+      satisfaction_text: "",
+      test_pass_value: "通过",
+      test_fail_value: "不通过",
+    };
+    let selectedResult = "";
+    let selectedScore = 0;
+    let leaving = false;
+
+    function formatError(data, res) {
+      if (typeof data.detail === "string") return data.detail;
+      if (Array.isArray(data.detail)) {
+        return data.detail.map((item) => item.msg || JSON.stringify(item)).join("；");
+      }
+      return data.message || `HTTP ${res.status} 请求失败`;
+    }
+
+    function api(path, options = {}) {
+      const joiner = path.includes("?") ? "&" : "?";
+      const url = `/feedback/api/${path}${joiner}token=${encodeURIComponent(token)}`;
+      return fetch(url, {
+        headers: { "Content-Type": "application/json", ...(options.headers || {}) },
+        ...options,
+      }).then(async (res) => {
+        let data = {};
+        const text = await res.text();
+        if (text) {
+          try { data = JSON.parse(text); } catch (_) { data = { detail: text.slice(0, 120) }; }
+        }
+        if (!res.ok) throw new Error(formatError(data, res));
+        return data;
+      });
+    }
+
+    function setToast(text, type = "") {
+      toastEl.textContent = text;
+      toastEl.className = "toast" + (type ? ` ${type}` : "");
+    }
+
+    function renderResultOptions() {
+      resultOptionsEl.innerHTML = "";
+      [state.test_pass_value, state.test_fail_value].forEach((label) => {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "option" + (selectedResult === label ? " active" : "");
+        btn.textContent = label;
+        btn.addEventListener("click", () => {
+          selectedResult = label;
+          renderResultOptions();
+        });
+        resultOptionsEl.appendChild(btn);
+      });
+    }
+
+    function renderScoreGrid() {
+      scoreGridEl.innerHTML = "";
+      for (let score = 1; score <= 10; score += 1) {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "score-btn" + (selectedScore === score ? " active" : "");
+        btn.textContent = String(score);
+        btn.addEventListener("click", () => {
+          selectedScore = score;
+          renderScoreGrid();
+        });
+        scoreGridEl.appendChild(btn);
+      }
+    }
+
+    function render() {
+      demandEl.textContent = state.demand_content || "（无需求内容）";
+      const metaParts = [];
+      if (state.system_name) metaParts.push(`所属系统：${state.system_name}`);
+      metaEl.textContent = metaParts.join("  ·  ");
+
+      if (state.already_submitted) {
+        formArea.style.display = "none";
+        readonlyArea.style.display = "block";
+        readonlyTextEl.textContent =
+          `您已提交评价：测试结果「${state.test_result_text || "—"}」，满意度 ${state.satisfaction_text || "—"} 分。`;
+        return;
+      }
+
+      formArea.style.display = "block";
+      readonlyArea.style.display = "none";
+      renderResultOptions();
+      renderScoreGrid();
+    }
+
+    function invokeCloseWindow() {
+      const bridgeTargets = [window];
+      if (window.parent && window.parent !== window) bridgeTargets.push(window.parent);
+      bridgeTargets.forEach((target) => {
+        try {
+          const bridge = target.WeixinJSBridge;
+          if (!bridge) return;
+          if (typeof bridge.call === "function") bridge.call("closeWindow");
+          if (typeof bridge.invoke === "function") bridge.invoke("closeWindow", {}, function () {});
+        } catch (_) {}
+      });
+      try { if (window.ww && typeof ww.closeWindow === "function") ww.closeWindow(); } catch (_) {}
+      try { if (window.wx && typeof wx.closeWindow === "function") wx.closeWindow(); } catch (_) {}
+      try { if (typeof window.close === "function") window.close(); } catch (_) {}
+    }
+
+    function closeWecomPage() {
+      invokeCloseWindow();
+      if (document.addEventListener) {
+        document.addEventListener("WeixinJSBridgeReady", invokeCloseWindow, false);
+      }
+      [50, 150, 400].forEach((ms) => setTimeout(invokeCloseWindow, ms));
+      setTimeout(() => {
+        if (window.history.length > 1) {
+          window.history.back();
+          return;
+        }
+        fallbackTipEl.style.display = "block";
+        setToast("请点左上角 ← 返回企业微信", "success");
+      }, 700);
+    }
+
+    async function initWecomJssdk() {
+      try {
+        const cfg = await api(`jssdk-config?url=${encodeURIComponent(location.href.split("#")[0])}`);
+        if (window.ww && typeof ww.register === "function") {
+          ww.register({
+            corpId: cfg.corpId,
+            agentId: cfg.agentId,
+            jsApiList: ["closeWindow"],
+            getConfigSignature: async () => cfg.configSignature,
+            getAgentConfigSignature: async () => cfg.agentConfigSignature,
+          });
+        }
+      } catch (_) {}
+    }
+
+    async function loadDetail() {
+      state = await api("detail");
+      render();
+    }
+
+    async function submitFeedback() {
+      if (!selectedResult) {
+        setToast("请选择测试结果", "error");
+        return;
+      }
+      if (!selectedScore) {
+        setToast("请选择满意度评分", "error");
+        return;
+      }
+      submitBtn.disabled = true;
+      setToast("提交中…");
+      try {
+        await api("submit", {
+          method: "POST",
+          body: JSON.stringify({
+            test_result: selectedResult,
+            satisfaction_score: selectedScore,
+          }),
+        });
+        setToast("提交成功", "success");
+        setTimeout(() => {
+          if (leaving) return;
+          leaving = true;
+          closeWecomPage();
+        }, 600);
+      } catch (err) {
+        submitBtn.disabled = false;
+        setToast(err.message || "提交失败", "error");
+      }
+    }
+
+    submitBtn.addEventListener("click", submitFeedback);
+    closeBtn.addEventListener("click", () => {
+      if (leaving) return;
+      leaving = true;
+      closeWecomPage();
+    });
+
+    if (!token) {
+      demandEl.textContent = "链接无效";
+    } else {
+      initWecomJssdk();
+      loadDetail().catch((err) => setToast(err.message, "error"));
+    }
+  </script>
+</body>
+</html>

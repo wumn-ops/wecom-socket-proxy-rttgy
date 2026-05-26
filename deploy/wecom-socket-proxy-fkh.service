@@ -1,0 +1,15 @@
+[Unit]
+Description=WeCom Socket Proxy FKH (WebSocket long connection)
+After=network.target
+
+[Service]
+Type=simple
+User=www-data
+WorkingDirectory=/path/to/wecom-socket-proxy-fkh
+EnvironmentFile=/path/to/wecom-socket-proxy-fkh/.env
+ExecStart=/path/to/wecom-socket-proxy-fkh/.venv/bin/python run.py
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
