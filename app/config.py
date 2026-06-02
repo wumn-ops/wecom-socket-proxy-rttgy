@@ -22,7 +22,7 @@ class Settings(BaseSettings):
 
     smartsheet_webhook_url: str = ""
     smartsheet_field_demand_content: str = "f9VtuW"
-    smartsheet_field_image: str = "fhZuXt"
+    smartsheet_field_image: str = "fE88Fv"
     smartsheet_field_submitter: str = "f04Gwj"
     smartsheet_field_system: str = "fJodHY"
     registration_system_options: str = "CRM,SAP,MES,其他"
@@ -41,6 +41,8 @@ class Settings(BaseSettings):
 
     public_base_url: str = ""
     register_upload_path: str = "/register/upload/rttgy"
+    register_daily_path: str = "/register/daily/rttgy"
+    register_daily_success_message: str = "您的需求已登记成功，感谢提交。"
     feedback_path: str = "/feedback/rttgy"
     upload_token_ttl_seconds: int = 3600
     feedback_token_ttl_seconds: int = 604800

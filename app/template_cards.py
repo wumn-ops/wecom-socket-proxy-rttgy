@@ -52,21 +52,27 @@ def build_button_interaction_card(
     return card
 
 
-def build_welcome_card(*, task_id: str | None = None) -> dict[str, Any]:
+def build_welcome_card(*, task_id: str | None = None, register_url: str = "") -> dict[str, Any]:
+    start_button: dict[str, Any] = {"text": "开始登记", "style": 1, "key": "start"}
+    if register_url:
+        start_button = {
+            "text": "开始登记",
+            "style": 4,
+            "type": 1,
+            "url": register_url,
+        }
+
     return build_button_interaction_card(
-        title="欢迎使用长连接机器人",
-        desc="WebSocket 模式",
-        sub_title="发送「登记 需求内容」或 /help",
+        title="欢迎使用需求登记助手",
+        desc="如遇页面超时，发送任意消息呼出新卡片",
+        sub_title="点击按钮填写需求并提交到智能表格",
         task_id=task_id or new_task_id(),
         horizontal_items=[
             {"keyname": "模式", "value": "长连接"},
-            {"keyname": "登记", "value": "登记 xxx"},
-            {"keyname": "指令", "value": "/help"},
+            {"keyname": "说明", "value": "填写后自动写入表格"},
         ],
-        buttons=[
-            {"text": "示例卡片", "style": 1, "key": "demo_card"},
-            {"text": "功能介绍", "style": 4, "key": "intro"},
-        ],
+        buttons=[start_button],
+        source_desc="需求登记助手",
     )
 
 

@@ -33,7 +33,8 @@ def add_demand_record(
 
     if system:
         system_field = settings.smartsheet_field_system
-        values[system_field] = system
+        # 智能表格「单选」列须为 [{"text": "选项名"}]，不能传纯字符串
+        values[system_field] = [{"text": system}]
 
     if images:
         image_field = settings.smartsheet_field_image

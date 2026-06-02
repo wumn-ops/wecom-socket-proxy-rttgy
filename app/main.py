@@ -5,6 +5,7 @@ from fastapi import FastAPI
 
 from app.config import get_settings
 from app.feedback_routes import router as feedback_router
+from app.register_daily_routes import router as register_daily_router
 from app.routes import router
 from app.upload_routes import router as upload_router
 from app.ws_service import WebSocketBotService
@@ -37,6 +38,7 @@ app.state.bot_service = bot_service
 app.include_router(router)
 app.include_router(upload_router)
 app.include_router(feedback_router)
+app.include_router(register_daily_router)
 
 
 @app.get("/")
@@ -47,5 +49,6 @@ async def root() -> dict[str, str]:
         "health": settings.health_path,
         "callback_placeholder": settings.wecom_callback_path,
         "register_upload": settings.register_upload_path,
+        "register_daily": settings.register_daily_path,
         "feedback": settings.feedback_path,
     }

@@ -26,6 +26,7 @@ from app.template_cards import (
     build_welcome_card,
     new_task_id,
 )
+from app.register_daily_routes import build_register_daily_page_url
 from app.upload_routes import build_upload_page_url
 
 logger = logging.getLogger(__name__)
@@ -35,12 +36,11 @@ REGISTER_CANCEL_KEY = "register_cancel"
 
 HELP_TEXT = (
     "可用指令：\n"
-    "- 登记 需求内容：发起需求登记（需选择所属系统）\n"
+    "- 发送任意消息：获取登记卡片，点击「开始登记」填写并提交\n"
+    "- 登记 需求内容：发起卡片登记流程（选系统、上传图片后在卡片提交）\n"
     "- ping / 测试：流式 echo\n"
     "- /help：本帮助\n"
-    "- 卡片 / /card：回复示例交互卡片\n"
-    "- 主动推送 / /push：测试 aibot_send_msg\n"
-    "- 其他文本：流式 echo 回复"
+    "- 主动推送 / /push：测试 aibot_send_msg"
 )
 
 
@@ -100,12 +100,16 @@ class BotMessageHandler:
     async def on_enter_chat(self, frame: dict[str, Any]) -> None:
         body = _frame_body(frame)
         _remember_context(body)
-        logger.info("进入会话 chat=%s user=%s", _chat_target(body), _userid(body))
+        userid = _userid(body)
+        logger.info("进入会话 chat=%s user=%s", _chat_target(body), userid)
+        register_url = build_register_daily_page_url(userid) if userid else ""
+        if userid and not register_url:
+            logger.warning("未配置 PUBLIC_BASE_URL，欢迎卡片无法打开登记 H5")
         await self._client.reply_welcome(
             frame,
             {
                 "msgtype": "template_card",
-                "template_card": build_welcome_card(),
+                "template_card": build_welcome_card(register_url=register_url),
             },
         )
 
@@ -191,6 +195,14 @@ class BotMessageHandler:
         if normalized in {"/push", "主动推送"}:
             await self._send_proactive_push()
             await self._reply_echo(frame, "已发送主动推送消息，请查看会话。")
+            return
+
+        register_url = build_register_daily_page_url(userid) if userid else ""
+        if register_url:
+            await self._client.reply_template_card(
+                frame,
+                build_welcome_card(register_url=register_url),
+            )
             return
 
         await self._reply_echo(frame, f"echo: {content or '（空）'}")
@@ -327,6 +339,24 @@ class BotMessageHandler:
         await self._client.reply_stream(frame, stream_id, "处理中…", False)
         await asyncio.sleep(0.3)
         await self._client.reply_stream(frame, stream_id, content, True)
+
+    async def notify_user_markdown(self, userid: str, content: str) -> bool:
+        target = connection_state.state.last_chat_id.strip()
+        if connection_state.state.last_userid == userid and target:
+            chat_id = target
+        else:
+            chat_id = userid.strip()
+        if not chat_id or not content.strip():
+            return False
+        await self._client.send_message(
+            chat_id,
+            {
+                "msgtype": "markdown",
+                "markdown": {"content": content.strip()},
+            },
+        )
+        logger.info("主动发送登记提醒 chat=%s userid=%s", chat_id, userid)
+        return True
 
     async def send_proactive_push(self, chat_id: str | None = None) -> bool:
         target = (chat_id or connection_state.state.last_chat_id).strip()
