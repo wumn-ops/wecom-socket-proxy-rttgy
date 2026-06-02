@@ -1,65 +1,75 @@
-# wecom-socket-proxy-fkh
+# wecom-socket-proxy-rttgy
 
-`wecom-socket-proxy` 的**独立副本**，用于单独部署一个 WebSocket 长连接实例，实现 FKH 相关定制功能，**不影响** `wecom-socket-proxy` / `wecom-proxy` 等其它项目。
+`wecom-socket-proxy` 的**独立副本**，用于单独部署 RTTGY 实例，**不影响**其它项目。
 
-## 与 wecom-socket-proxy 的关系
+## 与 wecom-socket-proxy 的区别
 
-| 项 | wecom-socket-proxy | wecom-socket-proxy-fkh（本项目） |
+| 项 | wecom-socket-proxy | wecom-socket-proxy-rttgy |
 |---|---|---|
-| 代码 | 同源 | 完整复制，可独立演进 |
-| 默认端口 | 8000 | **8001** |
-| Bot 凭证 | 原机器人 | **须配置独立 BotID + Secret** |
-| 状态文件 | `data/launch_notified.json` | 各自独立目录 |
-| systemd | `wecom-socket-proxy.service` | `wecom-socket-proxy-fkh.service` |
+| 后端端口 | 8000 | **8001**（部署时需与 fkh 等实例错开） |
+| Nginx 路径 | `/health`、`/register/upload` 等 | **带 `/rttgy` 后缀** |
+| Bot 凭证 | 原机器人 | **独立 BotID + Secret** |
 
-> 同一机器人 API 模式只能二选一（Webhook 或长连接）。本实例须使用**独立测试机器人**，并与原实例**同时运行**（不同端口 + 不同 Nginx 反代）。
+## 公网访问路径（Nginx → 后端端口）
+
+与现有 `wecom.vazyme.com:8021` 共用域名，通过路径区分：
+
+| 用途 | 公网 URL |
+|------|----------|
+| 健康检查 | `https://wecom.vazyme.com:8021/health/rttgy` |
+| Webhook 占位 | `https://wecom.vazyme.com:8021/wecom/aibot/callback/rttgy` |
+| H5 上传页 | `https://wecom.vazyme.com:8021/register/upload/rttgy?token=...` |
+| H5 评价页 | `https://wecom.vazyme.com:8021/feedback/rttgy?token=...` |
+
+卡片内 H5 链接由 `PUBLIC_BASE_URL` + `REGISTER_UPLOAD_PATH` / `FEEDBACK_PATH` 自动生成。
+
+## Nginx 配置示例
+
+见 `deploy/nginx-rttgy.conf`：
+
+```nginx
+location /wecom/aibot/callback/rttgy {
+    proxy_pass http://192.168.140.92:8001;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+}
+location /health/rttgy {
+    proxy_pass http://192.168.140.92:8001;
+}
+location /register/upload/rttgy {
+    proxy_pass http://192.168.140.92:8001;
+    client_max_body_size 10m;
+}
+location /feedback/rttgy {
+    proxy_pass http://192.168.140.92:8001;
+}
+```
+
+> `location /register/upload/rttgy` 为前缀匹配，会同时覆盖 `/register/upload/rttgy/api/*` 等子路径。
 
 ## 快速开始
 
 ```powershell
-cd D:\aiworkspace\cursor_space\wecom-socket-proxy-fkh
+cd D:\aiworkspace\cursor_space\wecom-socket-proxy-rttgy
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 copy .env.example .env
-# 编辑 .env：填入独立 WECOM_BOT_ID、WECOM_BOT_SECRET、PUBLIC_BASE_URL 等
+# 编辑 .env：独立 Bot 凭证、智能表格、独立 PORT 等
 python run.py
 ```
 
-启动后访问：`http://127.0.0.1:8001/health`
+本地直连：`http://127.0.0.1:8001/health/rttgy`
 
-## 企微后台配置
+## 关键 .env 配置
 
-1. 创建/选择**独立**智能机器人 → API 模式 → **长连接**
-2. 复制 **BotID**、**Secret** 到本项目的 `.env`
-3. 保存后启动本服务；日志应出现 `WebSocket 认证成功`
-
-## HTTP 接口
-
-与 `wecom-socket-proxy` 相同：
-
-| 方法 | 路径 | 说明 |
-|------|------|------|
-| GET | `/` | 服务信息 |
-| GET | `/health` | 健康检查 + WebSocket 连接状态 |
-| GET/POST | `/wecom/aibot/callback` | Webhook 占位 |
-| POST | `/api/test/push?chat_id=` | 测试主动推送 |
-| GET | `/register/upload` | H5 图片上传页 |
-| GET/POST | `/register/upload/api/*` | 上传 API |
-| GET | `/feedback` | H5 测试评价页 |
-| GET/POST | `/feedback/api/*` | 评价 API |
-
-## 服务器并行部署
-
-```bash
-# Nginx 新增 upstream 指向 127.0.0.1:8001（或使用独立域名）
-sudo cp deploy/wecom-socket-proxy-fkh.service /etc/systemd/system/
-# 修改 service 内 WorkingDirectory / ExecStart 路径
-sudo systemctl daemon-reload
-sudo systemctl enable --now wecom-socket-proxy-fkh
-curl http://127.0.0.1:8001/health
+```env
+PORT=8001
+WECOM_CALLBACK_PATH=/wecom/aibot/callback/rttgy
+HEALTH_PATH=/health/rttgy
+PUBLIC_BASE_URL=https://wecom.vazyme.com:8021
+REGISTER_UPLOAD_PATH=/register/upload/rttgy
+FEEDBACK_PATH=/feedback/rttgy
 ```
-
-## 功能说明
-
-需求登记、上线测试提醒、H5 评价等流程与 `wecom-socket-proxy` 一致，详见原项目 README。后续 FKH 定制功能在本仓库独立开发即可。

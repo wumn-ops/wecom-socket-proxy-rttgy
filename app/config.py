@@ -14,7 +14,8 @@ class Settings(BaseSettings):
     wecom_bot_secret: str = ""
     host: str = "0.0.0.0"
     port: int = 8001
-    wecom_callback_path: str = "/wecom/aibot/callback"
+    wecom_callback_path: str = "/wecom/aibot/callback/rttgy"
+    health_path: str = "/health/rttgy"
     log_level: str = "INFO"
 
     upload_token_secret: str = ""
@@ -39,8 +40,8 @@ class Settings(BaseSettings):
     issue_list_url: str = ""
 
     public_base_url: str = ""
-    register_upload_path: str = "/register/upload"
-    feedback_path: str = "/feedback"
+    register_upload_path: str = "/register/upload/rttgy"
+    feedback_path: str = "/feedback/rttgy"
     upload_token_ttl_seconds: int = 3600
     feedback_token_ttl_seconds: int = 604800
     max_upload_bytes: int = 5 * 1024 * 1024

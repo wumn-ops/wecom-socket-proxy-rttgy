@@ -20,7 +20,7 @@ def _bot_service(request: Request) -> WebSocketBotService:
     return service
 
 
-@router.get("/health")
+@router.get(settings.health_path)
 async def health() -> dict[str, object]:
     return {
         "status": "ok",
@@ -33,7 +33,7 @@ async def health() -> dict[str, object]:
 async def callback_placeholder_get() -> dict[str, str]:
     """Webhook 占位：当前服务使用长连接，不处理 URL 验证。"""
     return {
-        "service": "wecom-socket-proxy-fkh",
+        "service": "wecom-socket-proxy-rttgy",
         "mode": "websocket",
         "message": "本服务为长连接模式，消息经 WebSocket 收发；此路径仅保留给 Nginx 占位。",
     }

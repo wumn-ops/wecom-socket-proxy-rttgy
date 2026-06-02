@@ -1,0 +1,15 @@
+[Unit]
+Description=WeCom Socket Proxy RTTGY (WebSocket long connection)
+After=network.target
+
+[Service]
+Type=simple
+User=www-data
+WorkingDirectory=/path/to/wecom-socket-proxy-rttgy
+EnvironmentFile=/path/to/wecom-socket-proxy-rttgy/.env
+ExecStart=/path/to/wecom-socket-proxy-rttgy/.venv/bin/python run.py
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

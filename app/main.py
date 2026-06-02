@@ -27,7 +27,7 @@ async def lifespan(_app: FastAPI):
 
 
 app = FastAPI(
-    title="wecom-socket-proxy-fkh",
+    title="wecom-socket-proxy-rttgy",
     description="企业微信智能机器人 WebSocket 长连接代理",
     version="0.1.0",
     lifespan=lifespan,
@@ -42,9 +42,9 @@ app.include_router(feedback_router)
 @app.get("/")
 async def root() -> dict[str, str]:
     return {
-        "service": "wecom-socket-proxy-fkh",
+        "service": "wecom-socket-proxy-rttgy",
         "mode": "websocket",
-        "health": "/health",
+        "health": settings.health_path,
         "callback_placeholder": settings.wecom_callback_path,
         "register_upload": settings.register_upload_path,
         "feedback": settings.feedback_path,

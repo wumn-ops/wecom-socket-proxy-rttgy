@@ -220,9 +220,10 @@
       return data.message || `HTTP ${res.status} 请求失败`;
     }
 
+    const pageBase = location.pathname.split("?")[0].replace(/\/$/, "");
     function api(path, options = {}) {
       const joiner = path.includes("?") ? "&" : "?";
-      const url = `/feedback/api/${path}${joiner}token=${encodeURIComponent(token)}`;
+      const url = `${pageBase}/api/${path}${joiner}token=${encodeURIComponent(token)}`;
       return fetch(url, {
         headers: { "Content-Type": "application/json", ...(options.headers || {}) },
         ...options,

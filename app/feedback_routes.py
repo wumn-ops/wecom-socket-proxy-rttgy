@@ -19,6 +19,8 @@ from app.wecom_jssdk import build_jssdk_config
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["feedback"])
+_settings = get_settings()
+_FEEDBACK_BASE = _settings.feedback_path.rstrip("/")
 
 _HTML_PATH = Path(__file__).resolve().parent.parent / "static" / "feedback.html"
 
@@ -75,7 +77,7 @@ def _record_to_detail(record) -> dict[str, Any]:
     }
 
 
-@router.get("/feedback", response_class=HTMLResponse)
+@router.get(_FEEDBACK_BASE, response_class=HTMLResponse)
 async def feedback_page(token: str = Query(...)) -> HTMLResponse:
     _resolve_token(token)
     if not _HTML_PATH.is_file():
@@ -83,14 +85,14 @@ async def feedback_page(token: str = Query(...)) -> HTMLResponse:
     return HTMLResponse(_HTML_PATH.read_text(encoding="utf-8"))
 
 
-@router.get("/feedback/api/detail")
+@router.get(f"{_FEEDBACK_BASE}/api/detail")
 async def feedback_detail(token: str = Query(...)) -> dict[str, Any]:
     record_id, userid = _resolve_token(token)
     record = _load_record(record_id, userid)
     return _record_to_detail(record)
 
 
-@router.get("/feedback/api/jssdk-config")
+@router.get(f"{_FEEDBACK_BASE}/api/jssdk-config")
 async def feedback_jssdk_config(
     token: str = Query(...),
     url: str = Query(...),
@@ -99,7 +101,7 @@ async def feedback_jssdk_config(
     return build_jssdk_config(url)
 
 
-@router.post("/feedback/api/submit")
+@router.post(f"{_FEEDBACK_BASE}/api/submit")
 async def feedback_submit(
     body: FeedbackSubmitBody,
     token: str = Query(...),

@@ -18,6 +18,8 @@ from app.wecom_jssdk import build_jssdk_config
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["register-upload"])
+_settings = get_settings()
+_UPLOAD_BASE = _settings.register_upload_path.rstrip("/")
 
 _ALLOWED_CONTENT_TYPES = {
     "image/jpeg",
@@ -91,7 +93,7 @@ def _resolve_session(token: str):
     return session
 
 
-@router.get("/register/upload", response_class=HTMLResponse)
+@router.get(_UPLOAD_BASE, response_class=HTMLResponse)
 async def register_upload_page(token: str = Query(...)) -> HTMLResponse:
     _resolve_session(token)
     if not _HTML_PATH.is_file():
@@ -99,7 +101,7 @@ async def register_upload_page(token: str = Query(...)) -> HTMLResponse:
     return HTMLResponse(_HTML_PATH.read_text(encoding="utf-8"))
 
 
-@router.get("/register/upload/api/status")
+@router.get(f"{_UPLOAD_BASE}/api/status")
 async def register_upload_status(token: str = Query(...)) -> dict[str, Any]:
     session = _resolve_session(token)
     return {
@@ -110,7 +112,7 @@ async def register_upload_status(token: str = Query(...)) -> dict[str, Any]:
             {
                 "title": item.get("title", f"图片{index}"),
                 "preview_url": (
-                    f"/register/upload/api/preview?token={token}&index={index - 1}"
+                    f"{_UPLOAD_BASE}/api/preview?token={token}&index={index - 1}"
                 ),
             }
             for index, item in enumerate(session.uploaded_images, start=1)
@@ -118,7 +120,7 @@ async def register_upload_status(token: str = Query(...)) -> dict[str, Any]:
     }
 
 
-@router.get("/register/upload/api/jssdk-config")
+@router.get(f"{_UPLOAD_BASE}/api/jssdk-config")
 async def register_jssdk_config(
     token: str = Query(...),
     url: str = Query(...),
@@ -127,7 +129,7 @@ async def register_jssdk_config(
     return build_jssdk_config(url)
 
 
-@router.get("/register/upload/api/preview")
+@router.get(f"{_UPLOAD_BASE}/api/preview")
 async def register_upload_preview(
     token: str = Query(...),
     index: int = Query(..., ge=0),
@@ -144,7 +146,7 @@ async def register_upload_preview(
     )
 
 
-@router.post("/register/upload/api/image")
+@router.post(f"{_UPLOAD_BASE}/api/image")
 async def register_upload_image(
     token: str = Query(...),
     file: UploadFile = File(...),
@@ -195,7 +197,7 @@ async def register_upload_image(
     )
 
 
-@router.post("/register/upload/api/image/delete")
+@router.post(f"{_UPLOAD_BASE}/api/image/delete")
 async def register_delete_image(
     token: str = Query(...),
     index: int = Query(..., ge=0),

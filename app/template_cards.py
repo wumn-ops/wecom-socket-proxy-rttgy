@@ -23,7 +23,7 @@ def build_button_interaction_card(
     horizontal_items: list[dict[str, Any]] | None = None,
     buttons: list[dict[str, Any]] | None = None,
     button_selection: dict[str, Any] | None = None,
-    source_desc: str = "wecom-socket-proxy-fkh",
+    source_desc: str = "wecom-socket-proxy-rttgy",
 ) -> dict[str, Any]:
     card: dict[str, Any] = {
         "card_type": "button_interaction",

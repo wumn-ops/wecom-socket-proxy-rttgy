@@ -58,7 +58,7 @@ def _sign(payload: str) -> str:
     secret = (
         settings.upload_token_secret
         or settings.wecom_bot_secret
-        or "wecom-socket-proxy-fkh-upload"
+        or "wecom-socket-proxy-rttgy-upload"
     )
     return hmac.new(
         secret.encode("utf-8"),
