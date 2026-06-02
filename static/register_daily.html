@@ -76,6 +76,7 @@
       display: none; margin-top: 12px; padding: 12px; background: #fff7e6;
       border: 1px solid #ffd591; border-radius: 8px; font-size: 14px; color: #ad6800;
     }
+    .actions { margin-top: 16px; }
   </style>
 </head>
 <body>
@@ -105,7 +106,7 @@
         <button class="btn btn-primary" type="button" id="submitBtn">提交登记</button>
       </div>
 
-      <div class="success-box" id="successBox">提交成功，请返回企业微信。</div>
+      <div class="success-box" id="successBox">提交成功，页面将在倒计时结束后自动关闭。</div>
       <div class="actions" id="closeArea" style="display:none;">
         <button class="btn btn-primary" type="button" id="closeBtn">关闭</button>
       </div>
@@ -115,6 +116,7 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@wecom/jssdk@2.2.5/dist/wecom.global.prod.js"></script>
+  <script src="https://open.work.weixin.qq.com/wwopen/js/jweixin-1.2.0.js"></script>
   <script>
     const params = new URLSearchParams(location.search);
     const token = params.get("token") || "";
@@ -137,6 +139,54 @@
 
     let state = { image_count: 0, max_images: 3, images: [] };
     let modulesBySystem = {};
+    let leaving = false;
+    let closeCountdownTimer = null;
+    const AUTO_CLOSE_SECONDS = 3;
+
+    function updateCloseBtnText(seconds) {
+      closeBtn.textContent = seconds > 0 ? `关闭（${seconds}）` : "关闭";
+    }
+
+    function clearCloseCountdown() {
+      if (closeCountdownTimer !== null) {
+        clearInterval(closeCountdownTimer);
+        closeCountdownTimer = null;
+      }
+    }
+
+    function startCloseCountdown() {
+      clearCloseCountdown();
+      let seconds = AUTO_CLOSE_SECONDS;
+      updateCloseBtnText(seconds);
+      closeCountdownTimer = setInterval(() => {
+        seconds -= 1;
+        if (seconds <= 0) {
+          clearCloseCountdown();
+          requestClose();
+          return;
+        }
+        updateCloseBtnText(seconds);
+      }, 1000);
+    }
+
+    function requestClose() {
+      if (leaving) return;
+      leaving = true;
+      clearCloseCountdown();
+      updateCloseBtnText(0);
+      closeWecomPage();
+    }
+
+    function bindWeixinBridgeReady() {
+      if (typeof WeixinJSBridge !== "undefined") return;
+      const markReady = () => {};
+      if (document.addEventListener) {
+        document.addEventListener("WeixinJSBridgeReady", markReady, false);
+      } else if (document.attachEvent) {
+        document.attachEvent("onWeixinJSBridgeReady", markReady);
+      }
+    }
+    bindWeixinBridgeReady();
 
     function formatError(data, res) {
       if (res.status === 413) {
@@ -306,17 +356,34 @@
     }
 
     function invokeCloseWindow() {
+      const bridgeTargets = [window];
+      if (window.parent && window.parent !== window) bridgeTargets.push(window.parent);
+      bridgeTargets.forEach((target) => {
+        try {
+          const bridge = target.WeixinJSBridge;
+          if (!bridge) return;
+          if (typeof bridge.call === "function") bridge.call("closeWindow");
+          if (typeof bridge.invoke === "function") bridge.invoke("closeWindow", {}, function () {});
+        } catch (_) {}
+      });
       try { if (window.ww && typeof ww.closeWindow === "function") ww.closeWindow(); } catch (_) {}
+      try { if (window.wx && typeof wx.closeWindow === "function") wx.closeWindow(); } catch (_) {}
+      try { if (typeof window.close === "function") window.close(); } catch (_) {}
     }
 
     function closeWecomPage() {
       invokeCloseWindow();
+      if (document.addEventListener) {
+        document.addEventListener("WeixinJSBridgeReady", invokeCloseWindow, false);
+      }
+      [50, 150, 400].forEach((ms) => setTimeout(invokeCloseWindow, ms));
       setTimeout(() => {
         if (window.history.length > 1) {
           window.history.back();
           return;
         }
         fallbackTipEl.style.display = "block";
+        setToast("请点左上角 ← 返回企业微信", "success");
       }, 700);
     }
 
@@ -367,7 +434,7 @@
         successBox.style.display = "block";
         closeArea.style.display = "block";
         setToast("提交成功", "success");
-        setTimeout(closeWecomPage, 800);
+        startCloseCountdown();
       } catch (err) {
         setToast(err.message || "提交失败", "error");
         submitBtn.disabled = false;
@@ -388,7 +455,7 @@
       }
     });
     submitBtn.addEventListener("click", submitForm);
-    closeBtn.addEventListener("click", closeWecomPage);
+    closeBtn.addEventListener("click", requestClose);
     systemEl.addEventListener("change", () => {
       renderModuleOptions(systemEl.value || "");
     });
@@ -397,7 +464,7 @@
       try {
         await loadOptions();
         await refreshStatus();
-        initWecomJssdk().catch(() => {});
+        await initWecomJssdk();
       } catch (err) {
         setToast(err.message || "加载失败", "error");
       }
