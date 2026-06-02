@@ -85,11 +85,11 @@ def _is_image_payload(raw: bytes, filename: str, content_type: str) -> bool:
 def _resolve_session(token: str):
     parsed = verify_upload_token(token)
     if parsed is None:
-        raise HTTPException(status_code=403, detail="链接无效或已过期，请重新发起登记")
+        raise HTTPException(status_code=403, detail="链接无效或已过期，请返回企业微信重新呼叫打开登记卡片")
     task_id, userid = parsed
     session = registration_store.get(task_id)
     if session is None or session.userid != userid:
-        raise HTTPException(status_code=404, detail="登记会话不存在或已结束")
+        raise HTTPException(status_code=404, detail="登记会话不存在或已结束，请返回企业微信重新呼叫打开登记卡片")
     return session
 
 

@@ -43,6 +43,13 @@
       font-size: 15px;
       margin-bottom: 16px;
       background: #fff;
+      color: var(--text);
+      -webkit-appearance: menulist;
+      appearance: menulist;
+    }
+    .select option {
+      color: #1f2329;
+      background: #fff;
     }
     .textarea { min-height: 96px; resize: vertical; }
     .thumb-list { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
@@ -84,6 +91,9 @@
         <div class="field-label">所属系统</div>
         <select class="select" id="systemSelect"></select>
 
+        <div class="field-label" id="moduleLabel">所属模块</div>
+        <select class="select" id="moduleSelect"></select>
+
         <div class="field-label">附加图片 <span class="hint">（可选，最多 3 张）</span></div>
         <div class="thumb-list" id="thumbList"></div>
         <div class="upload-row">
@@ -112,6 +122,8 @@
     const toastEl = document.getElementById("toast");
     const demandEl = document.getElementById("demandContent");
     const systemEl = document.getElementById("systemSelect");
+    const moduleEl = document.getElementById("moduleSelect");
+    const moduleLabelEl = document.getElementById("moduleLabel");
     const thumbListEl = document.getElementById("thumbList");
     const imageHintEl = document.getElementById("imageHint");
     const fileInput = document.getElementById("fileInput");
@@ -124,6 +136,7 @@
     const fallbackTipEl = document.getElementById("fallbackTip");
 
     let state = { image_count: 0, max_images: 3, images: [] };
+    let modulesBySystem = {};
 
     function formatError(data, res) {
       if (res.status === 413) {
@@ -216,22 +229,65 @@
       pickBtn.disabled = state.image_count >= state.max_images;
     }
 
+    function renderModuleOptions(system, selectedValue = "") {
+      const modules = modulesBySystem[system] || [];
+      moduleEl.innerHTML = "";
+
+      if (!modules.length) {
+        moduleLabelEl.style.display = "none";
+        moduleEl.style.display = "none";
+        moduleEl.disabled = true;
+        return;
+      }
+
+      moduleLabelEl.style.display = "";
+      moduleEl.style.display = "";
+      moduleEl.disabled = false;
+
+      const placeholder = document.createElement("option");
+      placeholder.value = "";
+      placeholder.textContent = "请选择所属模块";
+      moduleEl.appendChild(placeholder);
+
+      modules.forEach((item) => {
+        const option = document.createElement("option");
+        option.value = item.value;
+        option.textContent = item.text;
+        moduleEl.appendChild(option);
+      });
+
+      if (selectedValue && modules.some((item) => item.value === selectedValue)) {
+        moduleEl.value = selectedValue;
+      }
+    }
+
     async function loadOptions() {
       const data = await api("options");
+      modulesBySystem = data.modules_by_system || {};
       systemEl.innerHTML = "";
+
+      const placeholder = document.createElement("option");
+      placeholder.value = "";
+      placeholder.textContent = "请选择所属系统";
+      systemEl.appendChild(placeholder);
+
       (data.options || []).forEach((opt) => {
         const option = document.createElement("option");
         option.value = opt.text;
         option.textContent = opt.text;
         systemEl.appendChild(option);
       });
+      renderModuleOptions(systemEl.value || "");
     }
 
     async function refreshStatus() {
       const data = await api("status");
       state = { ...state, ...data };
       if (data.demand_content) demandEl.value = data.demand_content;
-      if (data.system) systemEl.value = data.system;
+      if (data.system) {
+        systemEl.value = data.system;
+        renderModuleOptions(data.system);
+      }
       renderImages();
     }
 
@@ -281,6 +337,9 @@
     async function submitForm() {
       const demandContent = (demandEl.value || "").trim();
       const system = (systemEl.value || "").trim();
+      const module = (moduleEl.value || "").trim();
+      const modules = modulesBySystem[system] || [];
+
       if (!demandContent) {
         setToast("请填写需求内容", "error");
         demandEl.focus();
@@ -290,6 +349,11 @@
         setToast("请选择所属系统", "error");
         return;
       }
+      if (modules.length && !module) {
+        setToast("请选择所属模块", "error");
+        moduleEl.focus();
+        return;
+      }
 
       submitBtn.disabled = true;
       setToast("提交中…");
@@ -297,7 +361,7 @@
         await api("submit", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ demand_content: demandContent, system }),
+          body: JSON.stringify({ demand_content: demandContent, system, module }),
         });
         formArea.style.display = "none";
         successBox.style.display = "block";
@@ -325,14 +389,25 @@
     });
     submitBtn.addEventListener("click", submitForm);
     closeBtn.addEventListener("click", closeWecomPage);
+    systemEl.addEventListener("change", () => {
+      renderModuleOptions(systemEl.value || "");
+    });
+
+    async function bootstrap() {
+      try {
+        await loadOptions();
+        await refreshStatus();
+        initWecomJssdk().catch(() => {});
+      } catch (err) {
+        setToast(err.message || "加载失败", "error");
+      }
+    }
 
     if (!token) {
       setToast("链接无效，请从企业微信卡片重新进入", "error");
       submitBtn.disabled = true;
     } else {
-      Promise.all([loadOptions(), refreshStatus(), initWecomJssdk()]).catch((err) => {
-        setToast(err.message || "加载失败", "error");
-      });
+      bootstrap();
     }
   </script>
 </body>

@@ -68,11 +68,11 @@ def build_welcome_card(*, task_id: str | None = None, register_url: str = "") ->
         sub_title="点击按钮填写需求并提交到智能表格",
         task_id=task_id or new_task_id(),
         horizontal_items=[
-            {"keyname": "模式", "value": "长连接"},
-            {"keyname": "说明", "value": "填写后自动写入表格"},
+            #{"keyname": "模式", "value": "长连接"},
+            {"keyname": "说明", "value": "填写后提交自动写入表格"},
         ],
         buttons=[start_button],
-        source_desc="需求登记助手",
+        source_desc="问题及需求登记卡片",
     )
 
 

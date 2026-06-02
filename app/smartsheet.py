@@ -17,6 +17,7 @@ def add_demand_record(
     *,
     userid: str | None = None,
     system: str | None = None,
+    module: str | None = None,
     images: list[dict[str, str]] | None = None,
 ) -> tuple[bool, str]:
     """向智能表格新增一条记录，写入需求内容、提出人、所属系统与可选图片。"""
@@ -35,6 +36,16 @@ def add_demand_record(
         system_field = settings.smartsheet_field_system
         # 智能表格「单选」列须为 [{"text": "选项名"}]，不能传纯字符串
         values[system_field] = [{"text": system}]
+
+    if module:
+        module_field = settings.smartsheet_field_module.strip()
+        if module_field:
+            values[module_field] = [{"text": module}]
+
+    pm_field = settings.smartsheet_field_product_manager.strip()
+    pm_userid = settings.smartsheet_default_product_manager_userid.strip()
+    if pm_field and pm_userid:
+        values[pm_field] = [{"user_id": pm_userid}]
 
     if images:
         image_field = settings.smartsheet_field_image
@@ -73,10 +84,12 @@ def add_demand_record(
     errcode = data.get("errcode")
     if errcode == 0:
         logger.info(
-            "智能表格写入成功 content_field=%s submitter=%s system=%s image_count=%s",
+            "智能表格写入成功 content_field=%s submitter=%s system=%s module=%s pm=%s image_count=%s",
             content_field,
             userid or "",
             system or "",
+            module or "",
+            pm_userid if pm_field and pm_userid else "",
             len(images or []),
         )
         return True, "ok"

@@ -25,7 +25,16 @@ class Settings(BaseSettings):
     smartsheet_field_image: str = "fE88Fv"
     smartsheet_field_submitter: str = "f04Gwj"
     smartsheet_field_system: str = "fJodHY"
+    smartsheet_field_module: str = "fpSmCG"
+    smartsheet_field_product_manager: str = "fwOTnP"
+    smartsheet_default_product_manager_userid: str = "2237"
     registration_system_options: str = "CRM,SAP,MES,其他"
+    registration_module_options: str = (
+        "订单信息核对_VPS,工艺信息核对_VPS,质量信息核对_VPS,计划排程_VPS,车间排程_VPS,质量排程_VPS,"
+        "平板页面_MES,基础建模_MES,工艺建模_MES,计划管理_MES,生产管理_MES,质量管理_MES,包装管理_MES,"
+        "返工管理_MES,收发料管理_MES,接头管理_MES,明暗码管理_CPS,跨部门领料管理_CPS,SOP管理_CPS,"
+        "配方调阅管理_CPS,IQC转码管理_CPS,设备管理_CPS"
+    )
     smartsheet_docid: str = ""
     smartsheet_sheet_id: str = ""
     smartsheet_field_progress: str = "ftQMc5"
