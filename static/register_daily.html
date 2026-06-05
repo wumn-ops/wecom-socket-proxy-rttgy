@@ -332,12 +332,32 @@
 
     async function refreshStatus() {
       const data = await api("status");
+      const selectedSystem = (systemEl.value || "").trim();
+      const selectedModule = (moduleEl.value || "").trim();
+
       state = { ...state, ...data };
-      if (data.demand_content) demandEl.value = data.demand_content;
-      if (data.system) {
+
+      if (data.demand_content && !demandEl.value.trim()) {
+        demandEl.value = data.demand_content;
+      }
+      if (data.system && !selectedSystem) {
         systemEl.value = data.system;
         renderModuleOptions(data.system);
+      } else if (selectedSystem) {
+        systemEl.value = selectedSystem;
+        renderModuleOptions(selectedSystem, selectedModule);
       }
+      renderImages();
+    }
+
+    async function refreshImagesOnly() {
+      const data = await api("status");
+      state = {
+        ...state,
+        image_count: data.image_count,
+        max_images: data.max_images,
+        images: data.images || [],
+      };
       renderImages();
     }
 
@@ -347,12 +367,12 @@
       const form = new FormData();
       form.append("file", prepared);
       await api("image", { method: "POST", body: form });
-      await refreshStatus();
+      await refreshImagesOnly();
     }
 
     async function deleteImage(index) {
       await api(`image/delete?index=${index}`, { method: "POST" });
-      await refreshStatus();
+      await refreshImagesOnly();
     }
 
     function invokeCloseWindow() {

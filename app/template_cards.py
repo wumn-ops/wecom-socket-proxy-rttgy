@@ -319,7 +319,7 @@ def build_launch_test_reminder_card(
 ) -> dict[str, Any]:
     preview = demand_content[:80] + ("…" if len(demand_content) > 80 else "")
     horizontal: list[dict[str, Any]] = [
-        {"keyname": "状态", "value": "已上线"},
+        {"keyname": "状态", "value": "已解决待验证"},
         {"keyname": "提醒", "value": "请尽快测试"},
     ]
     if system_name:
@@ -351,8 +351,8 @@ def build_launch_test_reminder_card(
         )
 
     return build_button_interaction_card(
-        title="需求已上线，请测试",
-        desc="产品经理已标记上线",
+        title="需求已解决待验证，请测试",
+        desc="产品经理标记需求已解决待验证",
         sub_title=f"需求内容：{preview or '（无）'}",
         task_id=new_task_id(),
         horizontal_items=horizontal,
