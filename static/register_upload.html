@@ -423,9 +423,17 @@
       fileInput.click();
     }
 
+    async function prepareImageForUpload(file) {
+      try {
+        return await compressImage(file);
+      } catch (_) {
+        return file;
+      }
+    }
+
     async function uploadFile(file) {
-      setToast("正在压缩图片…");
-      const prepared = await compressImage(file);
+      setToast("正在上传图片…");
+      const prepared = await prepareImageForUpload(file);
       const form = new FormData();
       form.append("file", prepared);
       const data = await api("image", { method: "POST", body: form });

@@ -20,7 +20,9 @@ from app.module_options import (
 from app.smartsheet import add_demand_record
 from app.system_options import parse_option_list
 from app.template_cards import new_task_id
-from app.upload_routes import _detect_media_type, _is_image_payload
+from app.upload_routes import _detect_media_type
+from app.image_compress import ensure_image_within_limit
+from app.image_payload import incoming_upload_limit, prepare_image_upload
 from app.upload_token import create_upload_token, verify_upload_token
 from app.wecom_jssdk import build_jssdk_config
 
@@ -177,15 +179,34 @@ async def register_daily_upload_image(
     content_type = (file.content_type or "").lower()
     filename = file.filename or "upload.jpg"
     raw = await file.read()
-    if not raw:
-        raise HTTPException(status_code=400, detail="图片内容为空")
-    if not _is_image_payload(raw, filename, content_type):
-        raise HTTPException(status_code=400, detail="仅支持 JPG/PNG/GIF/WebP/BMP/HEIC 图片")
-    if len(raw) > settings.max_upload_bytes:
+    incoming_limit = incoming_upload_limit(
+        raw,
+        settings.max_upload_bytes,
+        settings.max_encrypted_upload_bytes,
+    )
+    if len(raw) > incoming_limit:
         raise HTTPException(
             status_code=400,
-            detail=f"单张图片不能超过 {settings.max_upload_bytes // (1024 * 1024)}MB",
+            detail=(
+                f"单张图片不能超过 {incoming_limit // (1024 * 1024)}MB"
+                if incoming_limit == settings.max_upload_bytes
+                else f"加密图片不能超过 {incoming_limit // (1024 * 1024)}MB"
+            ),
         )
+    try:
+        raw, filename = prepare_image_upload(
+            raw,
+            filename,
+            content_type,
+            session.userid,
+        )
+        raw, filename = ensure_image_within_limit(
+            raw,
+            filename,
+            settings.max_upload_bytes,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     index = len(session.uploaded_images) + 1
     ok, errmsg = registration_store.add_uploaded_image(

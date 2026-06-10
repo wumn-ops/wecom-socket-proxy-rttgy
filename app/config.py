@@ -56,6 +56,11 @@ class Settings(BaseSettings):
     upload_token_ttl_seconds: int = 3600
     feedback_token_ttl_seconds: int = 604800
     max_upload_bytes: int = 5 * 1024 * 1024
+    max_encrypted_upload_bytes: int = 10 * 1024 * 1024
+
+    file_decrypt_api_url: str = ""
+    file_decrypt_token: str = ""
+    file_decrypt_ssl_verify: bool = True
 
     wecom_corp_id: str = ""
     wecom_agent_id: str = ""

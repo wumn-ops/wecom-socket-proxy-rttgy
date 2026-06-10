@@ -11,6 +11,8 @@ from fastapi import APIRouter, File, HTTPException, Query, UploadFile
 from fastapi.responses import HTMLResponse, JSONResponse, Response
 
 from app.config import get_settings
+from app.image_compress import ensure_image_within_limit
+from app.image_payload import incoming_upload_limit, prepare_image_upload
 from app.registrations import MAX_REGISTRATION_IMAGES, registration_store
 from app.upload_token import create_upload_token, verify_upload_token
 from app.wecom_jssdk import build_jssdk_config
@@ -20,31 +22,6 @@ logger = logging.getLogger(__name__)
 router = APIRouter(tags=["register-upload"])
 _settings = get_settings()
 _UPLOAD_BASE = _settings.register_upload_path.rstrip("/")
-
-_ALLOWED_CONTENT_TYPES = {
-    "image/jpeg",
-    "image/jpg",
-    "image/png",
-    "image/gif",
-    "image/webp",
-    "image/bmp",
-    "image/heic",
-    "image/heif",
-    "application/octet-stream",
-}
-_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp", ".heic", ".heif"}
-_HTML_PATH = Path(__file__).resolve().parent.parent / "static" / "register_upload.html"
-
-
-def build_upload_page_url(task_id: str, userid: str) -> str:
-    settings = get_settings()
-    base = settings.public_base_url.rstrip("/")
-    if not base:
-        return ""
-    token = create_upload_token(task_id, userid)
-    path = settings.register_upload_path.rstrip("/")
-    return f"{base}{path}?token={token}"
-
 
 def _detect_media_type(raw: bytes) -> str:
     if len(raw) >= 3 and raw[:3] == b"\xff\xd8\xff":
@@ -60,26 +37,17 @@ def _detect_media_type(raw: bytes) -> str:
     return "image/jpeg"
 
 
-def _is_image_payload(raw: bytes, filename: str, content_type: str) -> bool:
-    ct = (content_type or "").lower().split(";", 1)[0].strip()
-    if ct in _ALLOWED_CONTENT_TYPES:
-        return True
+_HTML_PATH = Path(__file__).resolve().parent.parent / "static" / "register_upload.html"
 
-    ext = Path(filename or "").suffix.lower()
-    if ext in _IMAGE_EXTENSIONS and raw:
-        return True
 
-    if len(raw) >= 3 and raw[:3] == b"\xff\xd8\xff":
-        return True
-    if len(raw) >= 8 and raw[:8] == b"\x89PNG\r\n\x1a\n":
-        return True
-    if len(raw) >= 6 and raw[:6] in (b"GIF87a", b"GIF89a"):
-        return True
-    if len(raw) >= 12 and raw[:4] == b"RIFF" and raw[8:12] == b"WEBP":
-        return True
-    if len(raw) >= 2 and raw[:2] == b"BM":
-        return True
-    return False
+def build_upload_page_url(task_id: str, userid: str) -> str:
+    settings = get_settings()
+    base = settings.public_base_url.rstrip("/")
+    if not base:
+        return ""
+    token = create_upload_token(task_id, userid)
+    path = settings.register_upload_path.rstrip("/")
+    return f"{base}{path}?token={token}"
 
 
 def _resolve_session(token: str):
@@ -157,21 +125,41 @@ async def register_upload_image(
     content_type = (file.content_type or "").lower()
     filename = file.filename or "upload.jpg"
     raw = await file.read()
-    if not raw:
-        raise HTTPException(status_code=400, detail="图片内容为空")
-    if not _is_image_payload(raw, filename, content_type):
+    incoming_limit = incoming_upload_limit(
+        raw,
+        settings.max_upload_bytes,
+        settings.max_encrypted_upload_bytes,
+    )
+    if len(raw) > incoming_limit:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"单张图片不能超过 {incoming_limit // (1024 * 1024)}MB"
+                if incoming_limit == settings.max_upload_bytes
+                else f"加密图片不能超过 {incoming_limit // (1024 * 1024)}MB"
+            ),
+        )
+    try:
+        raw, filename = prepare_image_upload(
+            raw,
+            filename,
+            content_type,
+            session.userid,
+        )
+        raw, filename = ensure_image_within_limit(
+            raw,
+            filename,
+            settings.max_upload_bytes,
+        )
+    except ValueError as exc:
         logger.warning(
-            "拒绝上传: content_type=%s filename=%s size=%s",
+            "拒绝上传: content_type=%s filename=%s size=%s reason=%s",
             content_type,
             filename,
             len(raw),
+            exc,
         )
-        raise HTTPException(status_code=400, detail="仅支持 JPG/PNG/GIF/WebP/BMP/HEIC 图片")
-    if len(raw) > settings.max_upload_bytes:
-        raise HTTPException(
-            status_code=400,
-            detail=f"单张图片不能超过 {settings.max_upload_bytes // (1024 * 1024)}MB",
-        )
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     index = len(session.uploaded_images) + 1
     ok, errmsg = registration_store.add_uploaded_image(
