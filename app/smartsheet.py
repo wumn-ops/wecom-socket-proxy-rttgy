@@ -8,6 +8,7 @@ from typing import Any
 import httpx
 
 from app.config import get_settings
+from app.system_options import resolve_product_manager_userid
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +44,11 @@ def add_demand_record(
             values[module_field] = [{"text": module}]
 
     pm_field = settings.smartsheet_field_product_manager.strip()
-    pm_userid = settings.smartsheet_default_product_manager_userid.strip()
+    pm_userid = resolve_product_manager_userid(
+        system,
+        default_userid=settings.smartsheet_default_product_manager_userid,
+        mapping_raw=settings.registration_product_manager_by_system,
+    )
     if pm_field and pm_userid:
         values[pm_field] = [{"user_id": pm_userid}]
 

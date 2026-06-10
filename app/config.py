@@ -28,6 +28,7 @@ class Settings(BaseSettings):
     smartsheet_field_module: str = "fpSmCG"
     smartsheet_field_product_manager: str = "fwOTnP"
     smartsheet_default_product_manager_userid: str = "2237"
+    registration_product_manager_by_system: str = "SAP:5121"
     registration_system_options: str = "CRM,SAP,MES,其他"
     registration_module_options: str = (
         "订单信息核对_VPS,工艺信息核对_VPS,质量信息核对_VPS,计划排程_VPS,车间排程_VPS,质量排程_VPS,"

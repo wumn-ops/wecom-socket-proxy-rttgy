@@ -7,6 +7,29 @@ from typing import Any
 SYSTEM_QUESTION_KEY = "demand_system"
 
 
+def parse_product_manager_by_system(raw: str) -> dict[str, str]:
+    """解析「所属系统:产品经理userid」映射，如 SAP:5121,MES:2237。"""
+    mapping: dict[str, str] = {}
+    for part in raw.split(","):
+        item = part.strip()
+        if not item or ":" not in item:
+            continue
+        system, userid = item.split(":", 1)
+        system = system.strip()
+        userid = userid.strip()
+        if system and userid:
+            mapping[system] = userid
+    return mapping
+
+
+def resolve_product_manager_userid(system: str | None, *, default_userid: str, mapping_raw: str) -> str:
+    default = default_userid.strip()
+    if not system:
+        return default
+    mapping = parse_product_manager_by_system(mapping_raw)
+    return mapping.get(system.strip(), default)
+
+
 def parse_option_list(raw: str) -> list[dict[str, str]]:
     options: list[dict[str, str]] = []
     for index, part in enumerate(raw.split(",")):
