@@ -87,7 +87,7 @@
 
       <div id="formArea">
         <div class="field-label">需求内容</div>
-        <textarea class="textarea" id="demandContent" placeholder="请描述您的需求"></textarea>
+        <textarea class="textarea" id="demandContent" placeholder="请说明需求背景和业务价值"></textarea>
 
         <div class="field-label">所属系统</div>
         <select class="select" id="systemSelect"></select>
@@ -140,6 +140,7 @@
     let state = { image_count: 0, max_images: 3, images: [] };
     let modulesBySystem = {};
     let leaving = false;
+    let submitting = false;
     let closeCountdownTimer = null;
     const AUTO_CLOSE_SECONDS = 3;
 
@@ -430,27 +431,36 @@
     }
 
     async function submitForm() {
+      if (submitting) return;
+      submitting = true;
+      submitBtn.disabled = true;
+
       const demandContent = (demandEl.value || "").trim();
       const system = (systemEl.value || "").trim();
       const module = (moduleEl.value || "").trim();
       const modules = modulesBySystem[system] || [];
 
       if (!demandContent) {
+        submitting = false;
+        submitBtn.disabled = false;
         setToast("请填写需求内容", "error");
         demandEl.focus();
         return;
       }
       if (!system) {
+        submitting = false;
+        submitBtn.disabled = false;
         setToast("请选择所属系统", "error");
         return;
       }
       if (modules.length && !module) {
+        submitting = false;
+        submitBtn.disabled = false;
         setToast("请选择所属模块", "error");
         moduleEl.focus();
         return;
       }
 
-      submitBtn.disabled = true;
       setToast("提交中…");
       try {
         await api("submit", {
@@ -464,6 +474,7 @@
         setToast("提交成功", "success");
         startCloseCountdown();
       } catch (err) {
+        submitting = false;
         setToast(err.message || "提交失败", "error");
         submitBtn.disabled = false;
       }

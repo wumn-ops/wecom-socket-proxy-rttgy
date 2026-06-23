@@ -20,6 +20,7 @@ class RegistrationSession:
     system_option_id: str = ""
     system_name: str = ""
     uploaded_images: list[dict[str, str]] = field(default_factory=list)
+    submitting: bool = False
 
 
 class RegistrationStore:
@@ -119,6 +120,22 @@ class RegistrationStore:
             if session is None:
                 return []
             return list(session.uploaded_images)
+
+    def try_begin_submit(self, task_id: str) -> tuple[bool, str]:
+        with self._lock:
+            session = self._registrations.get(task_id)
+            if session is None:
+                return False, "登记会话不存在或已结束，请返回企业微信重新呼叫打开登记卡片"
+            if session.submitting:
+                return False, "正在提交中，请勿重复点击"
+            session.submitting = True
+            return True, ""
+
+    def release_submit(self, task_id: str) -> None:
+        with self._lock:
+            session = self._registrations.get(task_id)
+            if session is not None:
+                session.submitting = False
 
 
 registration_store = RegistrationStore()

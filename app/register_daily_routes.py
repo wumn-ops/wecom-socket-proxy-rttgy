@@ -275,6 +275,10 @@ async def register_daily_submit(
     session.demand_content = demand_content
     session.system_name = system
 
+    ok_claim, claim_err = registration_store.try_begin_submit(session.task_id)
+    if not ok_claim:
+        raise HTTPException(status_code=409, detail=claim_err)
+
     images = registration_store.list_smartsheet_images(session.task_id)
     ok, errmsg = add_demand_record(
         demand_content,
@@ -284,6 +288,7 @@ async def register_daily_submit(
         images=images or None,
     )
     if not ok:
+        registration_store.release_submit(session.task_id)
         raise HTTPException(status_code=502, detail=errmsg or "写入智能表格失败")
 
     logger.info(
