@@ -15,6 +15,7 @@ from app.image_compress import ensure_image_within_limit
 from app.image_payload import incoming_upload_limit, prepare_image_upload
 from app.registrations import MAX_REGISTRATION_IMAGES, registration_store
 from app.upload_token import create_upload_token, verify_upload_token
+from app.pc_upload_js import serve_upload_pc_image_js
 from app.wecom_jssdk import build_jssdk_config
 
 logger = logging.getLogger(__name__)
@@ -59,6 +60,11 @@ def _resolve_session(token: str):
     if session is None or session.userid != userid:
         raise HTTPException(status_code=404, detail="登记会话不存在或已结束，请返回企业微信重新呼叫打开登记卡片")
     return session
+
+
+@router.get(f"{_UPLOAD_BASE}/upload_pc_image.js")
+async def register_upload_pc_upload_js() -> Response:
+    return serve_upload_pc_image_js()
 
 
 @router.get(_UPLOAD_BASE, response_class=HTMLResponse)

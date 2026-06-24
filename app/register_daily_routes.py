@@ -24,6 +24,7 @@ from app.upload_routes import _detect_media_type
 from app.image_compress import ensure_image_within_limit
 from app.image_payload import incoming_upload_limit, prepare_image_upload
 from app.upload_token import create_upload_token, verify_upload_token
+from app.pc_upload_js import serve_upload_pc_image_js
 from app.wecom_jssdk import build_jssdk_config
 
 logger = logging.getLogger(__name__)
@@ -102,6 +103,11 @@ async def _notify_register_success(request: Request, userid: str) -> None:
     sent = await handler.notify_user_markdown(userid, message)
     if not sent:
         logger.warning("登记成功提醒发送失败 userid=%s", userid)
+
+
+@router.get(f"{_DAILY_BASE}/upload_pc_image.js")
+async def register_daily_pc_upload_js() -> Response:
+    return serve_upload_pc_image_js()
 
 
 @router.get(_DAILY_BASE, response_class=HTMLResponse)

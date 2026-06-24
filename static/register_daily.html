@@ -57,7 +57,25 @@
       width: 72px; height: 72px; border-radius: 8px; object-fit: cover;
       border: 1px solid var(--border); background: #fafafa;
     }
-    .upload-row { display: flex; gap: 8px; align-items: center; margin-bottom: 16px; }
+    .upload-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
+    .upload-row .btn-secondary { flex: 0 0 auto; }
+    .paste-zone {
+      display: block;
+      border: 1px dashed var(--border);
+      border-radius: 8px;
+      padding: 14px 12px;
+      text-align: center;
+      font-size: 13px;
+      line-height: 1.5;
+      color: var(--muted);
+      margin-bottom: 16px;
+      cursor: pointer;
+      outline: none;
+      background: #fafafa;
+    }
+    .paste-zone:focus { border-color: var(--primary); background: #f0f7ff; color: var(--text); }
+    .paste-zone[hidden] { display: none !important; }
+    .btn-capture[hidden] { display: none !important; }
     .btn {
       border: none; border-radius: 8px; padding: 12px 16px;
       font-size: 15px; cursor: pointer;
@@ -101,6 +119,13 @@
           <input type="file" id="fileInput" accept="image/*" hidden />
           <button type="button" class="btn btn-secondary" id="pickBtn">选择图片</button>
           <span id="imageHint" style="font-size:13px;color:var(--muted)">0 / 3</span>
+        </div>
+        <div class="paste-zone" id="pasteZone" style="text-align: left;" tabindex="0" hidden>
+          <strong>如需截图上传按以下步骤执行：</strong><br />
+          1、先截图<br />
+          2、然后点击此处待背景变蓝<br />
+          3、再点击Ctrl+V粘贴，即可将你截的图片粘贴到此处<br />
+          <!-- <span style="font-size:12px">也可使用 Win+Shift+S 截图后点击此处聚集粘贴</span> -->
         </div>
 
         <button class="btn btn-primary" type="button" id="submitBtn">提交登记</button>
@@ -499,11 +524,38 @@
       renderModuleOptions(systemEl.value || "");
     });
 
+    async function loadPcUploadScript() {
+      if (window.UploadPcImage) return;
+      await new Promise((resolve, reject) => {
+        const script = document.createElement("script");
+        script.src = `${pageBase}/upload_pc_image.js`;
+        script.onload = resolve;
+        script.onerror = () => reject(new Error("加载上传脚本失败"));
+        document.head.appendChild(script);
+      });
+    }
+
+    function initPcUpload() {
+      if (!window.UploadPcImage) return;
+      UploadPcImage.initPcImageUpload({
+        pasteZoneEl: document.getElementById("pasteZone"),
+        canUpload: () => state.image_count < state.max_images,
+        onFile: async (file) => {
+          setToast("上传中…");
+          await uploadImage(file);
+          setToast("上传成功", "success");
+        },
+        onError: (msg) => setToast(msg, "error"),
+      });
+    }
+
     async function bootstrap() {
       try {
         await loadOptions();
         await refreshStatus();
         await initWecomJssdk();
+        await loadPcUploadScript();
+        initPcUpload();
       } catch (err) {
         setToast(err.message || "加载失败", "error");
       }
